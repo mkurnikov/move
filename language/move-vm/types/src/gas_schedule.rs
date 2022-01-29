@@ -25,7 +25,8 @@ use move_core_types::{
 };
 use once_cell::sync::Lazy;
 
-static ZERO_COST_SCHEDULE: Lazy<CostTable> = Lazy::new(zero_cost_schedule);
+static ZERO_COST_SCHEDULE: Lazy<CostTable> =
+    Lazy::new(|| zero_cost_schedule(NUMBER_OF_NATIVE_FUNCTIONS));
 
 /// The Move VM implementation of state for gas metering.
 ///
@@ -164,7 +165,7 @@ pub fn new_from_instructions(
 
 // Only used for genesis and for tests where we need a cost table and
 // don't have a genesis storage state.
-pub fn zero_cost_schedule() -> CostTable {
+pub fn zero_cost_schedule(num_of_native_funcs: usize) -> CostTable {
     use Bytecode::*;
     // The actual costs for the instructions in this table _DO NOT MATTER_. This is only used
     // for genesis and testing, and for these cases we don't need to worry
@@ -279,15 +280,15 @@ pub fn zero_cost_schedule() -> CostTable {
         (VecUnpack(SignatureIndex::new(0), 0), GasCost::new(0, 0)),
         (VecSwap(SignatureIndex::new(0)), GasCost::new(0, 0)),
     ];
-    let native_table = (0..NUMBER_OF_NATIVE_FUNCTIONS)
+    let native_table = (0..num_of_native_funcs)
         .map(|_| GasCost::new(0, 0))
         .collect::<Vec<GasCost>>();
     new_from_instructions(instrs, native_table)
 }
 
-pub static INITIAL_GAS_SCHEDULE: Lazy<CostTable> = Lazy::new(|| {
+pub fn bytecode_instruction_costs() -> Vec<(Bytecode, GasCost)> {
     use Bytecode::*;
-    let mut instrs = vec![
+    return vec![
         (MoveTo(StructDefinitionIndex::new(0)), GasCost::new(13, 1)),
         (
             MoveToGeneric(StructDefInstantiationIndex::new(0)),
@@ -399,6 +400,10 @@ pub static INITIAL_GAS_SCHEDULE: Lazy<CostTable> = Lazy::new(|| {
         (VecUnpack(SignatureIndex::new(0), 0), GasCost::new(572, 1)),
         (VecSwap(SignatureIndex::new(0)), GasCost::new(1436, 1)),
     ];
+}
+
+pub static INITIAL_COST_SCHEDULE: Lazy<CostTable> = Lazy::new(|| {
+    let mut instrs = bytecode_instruction_costs();
     // Note that the DiemVM is expecting the table sorted by instruction order.
     instrs.sort_by_key(|cost| instruction_key(&cost.0));
 
@@ -452,11 +457,11 @@ pub fn calculate_intrinsic_gas(
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq, PartialOrd, Ord)]
 #[repr(u8)]
 pub enum NativeCostIndex {
-    SHA2_256 = 0,
-    SHA3_256 = 1,
-    ED25519_VERIFY = 2,
-    ED25519_THRESHOLD_VERIFY = 3,
-    BCS_TO_BYTES = 4,
+    BCS_TO_BYTES = 0,
+    EMIT_EVENT = 1,
+    SHA2_256 = 2,
+    SHA3_256 = 3,
+    SIGNER_BORROW = 4,
     LENGTH = 5,
     EMPTY = 6,
     BORROW = 7,
@@ -465,9 +470,15 @@ pub enum NativeCostIndex {
     POP_BACK = 10,
     DESTROY_EMPTY = 11,
     SWAP = 12,
-    ED25519_VALIDATE_KEY = 13,
-    SIGNER_BORROW = 14,
-    CREATE_SIGNER = 15,
-    DESTROY_SIGNER = 16,
-    EMIT_EVENT = 17,
+    CREATE_SIGNER = 13,
+    DESTROY_SIGNER = 14,
+    ED25519_VERIFY = 15,
+    ED25519_THRESHOLD_VERIFY = 16,
+    ED25519_VALIDATE_KEY = 17,
+}
+
+impl Into<u8> for NativeCostIndex {
+    fn into(self) -> u8 {
+        self as u8
+    }
 }
