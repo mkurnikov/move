@@ -477,8 +477,8 @@ pub enum NativeCostIndex {
     ED25519_VALIDATE_KEY = 17,
 }
 
-impl Into<u8> for NativeCostIndex {
-    fn into(self) -> u8 {
-        self as u8
+impl From<NativeCostIndex> for u8 {
+    fn from(index: NativeCostIndex) -> Self {
+        index as u8
     }
 }
