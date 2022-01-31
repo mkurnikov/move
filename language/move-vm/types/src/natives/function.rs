@@ -106,9 +106,9 @@ impl NativeResult {
 
 /// Return the native gas entry in `CostTable` for the given key.
 /// The key is the specific native function index known to `CostTable`.
-pub fn native_gas<NativeIndex: Into<u8>>(
+pub fn native_gas(
     table: &CostTable,
-    native_table_idx: NativeIndex,
+    native_table_idx: impl Into<u8>,
     size: usize,
 ) -> InternalGasUnits<GasCarrier> {
     let gas_amt = table.native_cost(native_table_idx.into());
