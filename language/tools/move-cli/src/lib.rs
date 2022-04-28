@@ -19,7 +19,8 @@ const BCS_EXTENSION: &str = "bcs";
 
 use anyhow::Result;
 use move_core_types::{
-    account_address::AccountAddress, errmap::ErrorMapping, identifier::Identifier,
+    account_address::AccountAddress, errmap::ErrorMapping, gas_schedule::CostTable,
+    identifier::Identifier,
 };
 use move_vm_runtime::native_functions::NativeFunction;
 use std::path::PathBuf;
@@ -42,15 +43,15 @@ pub struct Move {
         parse(from_os_str),
         default_value = "."
     )]
-    package_path: PathBuf,
+    pub package_path: PathBuf,
 
     /// Print additional diagnostics if available.
     #[structopt(short = "v", global = true)]
-    verbose: bool,
+    pub verbose: bool,
 
     /// Package build options
     #[structopt(flatten)]
-    build_config: BuildConfig,
+    pub build_config: BuildConfig,
 }
 
 /// MoveCLI is the CLI that will be executed by the `move-cli` command
@@ -69,13 +70,13 @@ pub struct MoveCLI {
 pub enum Command {
     /// Execute a package command. Executed in the current directory or the closest containing Move
     /// package.
-    #[structopt(name = "package")]
+    #[structopt(name = "package", display_order = 1)]
     Package {
         #[structopt(subcommand)]
         cmd: package::cli::PackageCommand,
     },
     /// Execute a sandbox command.
-    #[structopt(name = "sandbox")]
+    #[structopt(name = "sandbox", display_order = 2)]
     Sandbox {
         /// Directory storing Move resources, events, and module bytecodes produced by module publishing
         /// and script execution.
@@ -85,7 +86,7 @@ pub enum Command {
         cmd: sandbox::cli::SandboxCommand,
     },
     /// (Experimental) Run static analyses on Move source or bytecode.
-    #[structopt(name = "experimental")]
+    #[structopt(name = "experimental", display_order = 3)]
     Experimental {
         /// Directory storing Move resources, events, and module bytecodes produced by module publishing
         /// and script execution.
@@ -98,14 +99,19 @@ pub enum Command {
 
 pub fn run_cli(
     natives: Vec<NativeFunctionRecord>,
+    cost_table: &CostTable,
     error_descriptions: &ErrorMapping,
     move_args: &Move,
     cmd: &Command,
 ) -> Result<()> {
     match cmd {
-        Command::Sandbox { storage_dir, cmd } => {
-            cmd.handle_command(natives, error_descriptions, move_args, storage_dir)
-        }
+        Command::Sandbox { storage_dir, cmd } => cmd.handle_command(
+            natives,
+            cost_table,
+            error_descriptions,
+            move_args,
+            storage_dir,
+        ),
         Command::Experimental { storage_dir, cmd } => cmd.handle_command(move_args, storage_dir),
         Command::Package { cmd } => package::cli::handle_package_commands(
             &move_args.package_path,
@@ -118,8 +124,15 @@ pub fn run_cli(
 
 pub fn move_cli(
     natives: Vec<NativeFunctionRecord>,
+    cost_table: &CostTable,
     error_descriptions: &ErrorMapping,
 ) -> Result<()> {
     let args = MoveCLI::from_args();
-    run_cli(natives, error_descriptions, &args.move_args, &args.cmd)
+    run_cli(
+        natives,
+        cost_table,
+        error_descriptions,
+        &args.move_args,
+        &args.cmd,
+    )
 }
